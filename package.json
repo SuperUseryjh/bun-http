@@ -1,6 +1,6 @@
 {
-  "name": "bun-http",
-  "version": "0.1.0",
+  "name": "bun-server",
+  "version": "1.0.0",
   "description": "A lightweight Express-like HTTP framework for Bun",
   "main": "src/index.ts",
   "module": "src/index.ts",
