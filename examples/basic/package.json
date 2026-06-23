@@ -1,0 +1,8 @@
+{
+  "name": "bun-http-example",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch server.ts"
+  }
+}

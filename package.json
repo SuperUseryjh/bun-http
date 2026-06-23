@@ -1,0 +1,22 @@
+{
+  "name": "bun-http",
+  "version": "0.1.0",
+  "description": "A lightweight Express-like HTTP framework for Bun",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "example": "bun run examples/basic/server.ts"
+  },
+  "keywords": ["bun", "http", "framework", "express", "router"],
+  "license": "MIT",
+  "peerDependencies": {
+    "ejs": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ejs": "^3.1.0"
+  }
+}
