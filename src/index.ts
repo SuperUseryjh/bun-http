@@ -13,4 +13,5 @@ export type {
     ExtendedResponse,
     RouteEntry,
     MiddlewareEntry,
+    ViewEngine,
 } from './types';

@@ -9,6 +9,7 @@ import type {
     ExtendedResponse,
     SetCookieOptions,
     RequestParams,
+    ViewEngine,
 } from './types';
 
 // ============================================================
@@ -25,6 +26,34 @@ export class App {
     _router: Router = new Router();
     /** Reference to the routes Router entry, used for hot reload replacement */
     private _routesEntry: MiddlewareEntry | null = null;
+    /** Registered view engines */
+    _viewEngines: ViewEngine[] = [];
+
+    /**
+     * Register a custom view engine.
+     * @param engine ViewEngine object with extensions and render function
+     * @example
+     * app.use({ extensions: ['.tsx', '.jsx'], render: async (path, data) => { ... } });
+     */
+    use(engine: ViewEngine): void;
+    use(prefix: string, handler: Router | RouteHandler): void;
+    use(handler: Router | RouteHandler): void;
+    use(...args: any[]): void {
+        if (args.length === 1) {
+            const arg = args[0];
+            // Check if it's a ViewEngine (has extensions + render)
+            if (arg && Array.isArray(arg.extensions) && typeof arg.render === 'function') {
+                this._viewEngines.push(arg);
+                return;
+            }
+            // Otherwise it's a Router or RouteHandler
+            if (arg instanceof Router || typeof arg === 'function') {
+                this._middleware.push({ prefix: '/', handler: arg, isRouter: arg instanceof Router });
+            }
+        } else if (args.length === 2) {
+            this._middleware.push({ prefix: args[0], handler: args[1], isRouter: args[1] instanceof Router });
+        }
+    }
 
     set(key: string, value: any): void { this._settings[key] = value; }
 
@@ -40,17 +69,6 @@ export class App {
     post(path: string, ...handlers: RouteHandler[]): void { this._router.post(path, ...handlers); }
     put(path: string, ...handlers: RouteHandler[]): void { this._router.put(path, ...handlers); }
     delete(path: string, ...handlers: RouteHandler[]): void { this._router.delete(path, ...handlers); }
-
-    use(...args: any[]): void {
-        if (args.length === 1) {
-            const h = args[0];
-            if (h instanceof Router || typeof h === 'function') {
-                this._middleware.push({ prefix: '/', handler: h, isRouter: h instanceof Router });
-            }
-        } else if (args.length === 2) {
-            this._middleware.push({ prefix: args[0], handler: args[1], isRouter: args[1] instanceof Router });
-        }
-    }
 
     /** Register Router and store reference for hot reload replacement */
     setRoutes(router: Router): void {
@@ -96,13 +114,47 @@ export class App {
     }
 
     async renderView(viewName: string, data: Record<string, any>): Promise<string> {
-        const viewPath = path.join(this._viewsDir, viewName.endsWith('.ejs') ? viewName : viewName + '.ejs');
-        if (!fs.existsSync(viewPath)) {
-            throw new Error(`View not found: ${viewPath}`);
+        // Resolve full view path, trying all known extensions
+        const { viewPath, ext } = this._resolveViewPath(viewName);
+        if (!viewPath) {
+            throw new Error(`View not found: ${viewName}`);
         }
+
+        // Check custom engine registry first
+        if (ext) {
+            for (const engine of this._viewEngines) {
+                const normalizedExts = engine.extensions.map(e => e.startsWith('.') ? e : `.${e}`);
+                if (normalizedExts.includes(ext)) {
+                    return engine.render(viewPath, data);
+                }
+            }
+        }
+
+        // Fallback to default EJS engine
         const content = fs.readFileSync(viewPath, 'utf-8');
         const template = ejs.compile(content, { filename: viewPath });
         return template(data);
+    }
+
+    private _resolveViewPath(viewName: string): { viewPath: string | null; ext: string | null } {
+        // If viewName already has extension
+        const knownExts = ['.ejs', '.jsx', '.tsx', '.js', '.ts', '.pug', '.hbs'];
+        const nameExt = knownExts.find(ext => viewName.endsWith(ext));
+        if (nameExt) {
+            const fullPath = path.join(this._viewsDir, viewName);
+            if (fs.existsSync(fullPath)) return { viewPath: fullPath, ext: nameExt };
+            return { viewPath: null, ext: nameExt };
+        }
+
+        // Collect all registered custom extensions, then try .ejs
+        const customExts = this._viewEngines.flatMap(e => e.extensions.map(ext => ext.startsWith('.') ? ext : `.${ext}`));
+        const tryExts = [...new Set(customExts), '.ejs'];
+        for (const ext of tryExts) {
+            const fullPath = path.join(this._viewsDir, viewName + ext);
+            if (fs.existsSync(fullPath)) return { viewPath: fullPath, ext };
+        }
+
+        return { viewPath: null, ext: null };
     }
 
     listen(port: number, callback?: () => void): any {

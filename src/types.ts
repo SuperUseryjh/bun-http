@@ -85,6 +85,13 @@ export interface RouteEntry {
     handlers: RouteHandler[];
 }
 
+export interface ViewEngine {
+    /** File extensions this engine handles (e.g. ['.tsx', '.jsx']) */
+    extensions: string[];
+    /** Render function: receives viewPath + data, returns HTML string */
+    render: (viewPath: string, data: Record<string, any>) => Promise<string>;
+}
+
 export interface MiddlewareEntry {
     prefix: string;
     handler: Router | RouteHandler;
